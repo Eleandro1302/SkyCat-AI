@@ -5,11 +5,13 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   
   return {
-    base: './', // Ensures assets load correctly on GitHub Pages or subdirectories
+    base: './', 
     plugins: [react()],
     define: {
-      // This string replacement is safer than polyfilling the entire process object
-      'process.env.API_KEY': JSON.stringify(env.API_KEY),
+      // Substitui process.env.API_KEY diretamente pelo valor da string durante o build
+      'process.env.API_KEY': JSON.stringify(env.API_KEY || ""),
+      // Previne crash se alguma biblioteca tentar acessar 'process' diretamente
+      'process.env': {},
     }
   };
 });

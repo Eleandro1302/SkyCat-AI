@@ -7,11 +7,11 @@ const getAIClient = () => {
   if (genAI) return genAI;
 
   try {
-    // Vite will replace 'process.env.API_KEY' with the actual string value during build.
-    // We check if it exists and is not empty.
+    // Vite substitui process.env.API_KEY pela string durante o build.
+    // Verificamos se é uma string válida e não vazia.
     const apiKey = process.env.API_KEY;
     
-    if (!apiKey) {
+    if (!apiKey || typeof apiKey !== 'string' || apiKey.length === 0) {
       console.warn("API_KEY is missing. AI features disabled.");
       return null;
     }
@@ -49,7 +49,7 @@ export const generateWeatherInsight = async (data: WeatherData): Promise<string>
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-latest', // Using the fast/latest model alias
+      model: 'gemini-2.5-flash-latest',
       contents: prompt,
     });
     

@@ -12,7 +12,7 @@ import AirQualityPanel from './components/AirQualityPanel';
 import WeatherEffects from './components/WeatherEffects';
 
 const App: React.FC = () => {
-  // Default to ONBOARDING. Only switch to LOADING if we have a concrete action.
+  // Inicia explicitamente no ONBOARDING para garantir que algo seja renderizado imediatamente
   const [appState, setAppState] = useState<AppState>(AppState.ONBOARDING);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -27,15 +27,34 @@ const App: React.FC = () => {
     }
   }, [isSearchOpen]);
 
-  // INITIALIZATION LOGIC
+  // Lógica de Inicialização Segura
   useEffect(() => {
-    const checkSavedLocation = () => {
+    let isMounted = true;
+    
+    const init = async () => {
+      // Verifica se o usuário já permitiu localização anteriormente
       const savedPreference = localStorage.getItem('skycast_use_location');
+      
       if (savedPreference === 'true') {
-        handleGrantLocation();
+        if (isMounted) setAppState(AppState.LOADING);
+        
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            if (isMounted) handleLocationFound(pos.coords.latitude, pos.coords.longitude);
+          },
+          (err) => {
+            console.warn("Auto-location error:", err);
+            // Se falhar, volta para tela inicial
+            if (isMounted) setAppState(AppState.ONBOARDING);
+          },
+          { timeout: 5000 }
+        );
       }
     };
-    checkSavedLocation();
+
+    init();
+
+    return () => { isMounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -49,7 +68,7 @@ const App: React.FC = () => {
       setSearchQuery("");
     } catch (error) {
       console.error("Failed to load weather", error);
-      alert("Could not load weather data. Please try again.");
+      alert("Unable to fetch weather data. Please check your internet connection.");
       setAppState(AppState.ONBOARDING);
     }
   };
@@ -60,7 +79,6 @@ const App: React.FC = () => {
     let districtName = "";
     
     try {
-      // Fast reverse geocoding
       const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
       if (response.ok) {
         const data = await response.json();
@@ -88,12 +106,9 @@ const App: React.FC = () => {
       (err) => {
         console.warn(err);
         setAppState(AppState.ONBOARDING);
-        // Don't alert immediately on auto-load failure to be less annoying
-        if (appState !== AppState.ONBOARDING) {
-             alert("Location access denied or failed.");
-        }
+        alert("Location access denied or timed out.");
       },
-      { timeout: 10000, enableHighAccuracy: false }
+      { timeout: 10000 }
     );
   };
 
@@ -103,7 +118,7 @@ const App: React.FC = () => {
 
     setAppState(AppState.LOADING);
     
-    // 1. Check Predefined Constants
+    // 1. Tenta cidades predefinidas (mais rápido)
     const normalized = searchQuery.trim().toLowerCase();
     const predefinedKey = Object.keys(CITY_COORDINATES).find(k => k.toLowerCase() === normalized);
     
@@ -113,14 +128,13 @@ const App: React.FC = () => {
       return;
     }
 
-    // 2. OpenStreetMap Search
+    // 2. Busca na API OpenStreetMap
     try {
       const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1`);
       if (response.ok) {
         const results = await response.json();
         if (results.length > 0) {
           const { lat, lon, name, display_name } = results[0];
-          // Prefer simple name, fallback to first part of display name
           const cityName = name || display_name.split(',')[0];
           loadWeather(parseFloat(lat), parseFloat(lon), cityName);
         } else {
@@ -150,7 +164,7 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4">
         <div className="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mb-4"></div>
         <p className="text-slate-400 animate-pulse text-center">
-          Loading Forecast...
+          Fetching Forecast...
         </p>
         <button 
           onClick={() => setAppState(AppState.ONBOARDING)}
@@ -162,7 +176,7 @@ const App: React.FC = () => {
     );
   }
 
-  // Fallback to ONBOARDING if no data
+  // Se não houver dados, mostra tela de busca (Onboarding)
   if (appState === AppState.ONBOARDING || !weatherData) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 relative overflow-hidden">

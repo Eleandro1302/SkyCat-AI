@@ -7,8 +7,8 @@ const getAIClient = () => {
   if (genAI) return genAI;
 
   try {
-    // Vite substitui process.env.API_KEY pela string durante o build.
-    // Verificamos se é uma string válida e não vazia.
+    // O Vite substitui process.env.API_KEY pelo valor real durante o build.
+    // Se estiver no GitHub Pages sem a Secret configurada, isso pode ser uma string vazia.
     const apiKey = process.env.API_KEY;
     
     if (!apiKey || typeof apiKey !== 'string' || apiKey.length === 0) {
@@ -28,7 +28,7 @@ export const generateWeatherInsight = async (data: WeatherData): Promise<string>
   const ai = getAIClient();
   
   if (!ai) {
-    return "AI insights unavailable (API Key missing).";
+    return "AI insights unavailable (API Key missing/invalid).";
   }
 
   const locationContext = data.location.city === 'Current Location' 
@@ -48,15 +48,23 @@ export const generateWeatherInsight = async (data: WeatherData): Promise<string>
   `;
 
   try {
-    // Usando gemini-1.5-flash para garantir compatibilidade e evitar erro 404
+    // Usamos 'gemini-1.5-flash' pois é o modelo estável padrão.
+    // Modelos 'experimental' ou 'latest' frequentemente mudam de nome ou ficam indisponíveis.
     const response = await ai.models.generateContent({
       model: 'gemini-1.5-flash',
       contents: prompt,
     });
     
     return response.text || "Insight unavailable.";
-  } catch (error) {
-    console.error("Gemini API Error:", error);
+  } catch (error: any) {
+    // Melhor tratamento de erro para debug no console do navegador
+    console.error("Gemini API Error details:", error);
+    if (error.message?.includes("404")) {
+        return "AI Model temporarily unavailable (404).";
+    }
+    if (error.message?.includes("400") || error.message?.includes("API key")) {
+        return "Invalid API Key configuration.";
+    }
     return "AI service temporarily unavailable.";
   }
 };

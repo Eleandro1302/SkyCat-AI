@@ -1,15 +1,21 @@
 import { GoogleGenAI } from "@google/genai";
 import { WeatherData } from '../types';
 
+// Declaração simples para TypeScript não reclamar do process.env
+declare var process: {
+  env: {
+    API_KEY: string;
+  };
+};
+
 export const generateWeatherInsight = async (data: WeatherData): Promise<string> => {
   try {
-    // PADRÃO VITE: Para expor variáveis no frontend, elas devem começar com VITE_
-    // e são acessadas via import.meta.env
-    const apiKey = import.meta.env.VITE_API_KEY;
+    // O Parcel substituirá process.env.API_KEY pelo valor real no momento do build
+    const apiKey = process.env.API_KEY;
     
-    if (!apiKey) {
-      console.warn("VITE_API_KEY não encontrada. Insights desativados.");
-      return "AI insights unavailable (Configure VITE_API_KEY).";
+    if (!apiKey || apiKey.trim() === "") {
+      console.warn("API Key ausente. Adicione API_KEY ao seu arquivo .env ou Secrets do GitHub.");
+      return "AI insights unavailable (Configure API_KEY).";
     }
 
     const ai = new GoogleGenAI({ apiKey });

@@ -7,17 +7,13 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   
   return {
-    // CRITICAL for GitHub Pages: Use relative paths for assets
-    base: './', 
+    base: './', // Important for GitHub Pages
     plugins: [react()],
     define: {
-      // Robustly polyfill process.env for browser compatibility
-      // We define the specific key string replacement first
-      'process.env.API_KEY': JSON.stringify(env.API_KEY),
-      // We define process.env object fallback to prevent "cannot read property of undefined"
-      'process.env': JSON.stringify({}),
-      // We define global process to prevent "process is not defined"
-      'process': JSON.stringify({ env: {} }),
+      // Prevents "process is not defined" error in browser
+      'process.env': JSON.stringify(env), 
+      // Specifically ensure API_KEY is available
+      'process.env.API_KEY': JSON.stringify(env.API_KEY || "")
     }
   };
 });

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Navigation, Bell, Settings, Menu, ShieldAlert, LocateFixed, Search, X } from 'lucide-react';
+import { Navigation, Bell, Settings, Menu, ShieldAlert, LocateFixed, Search, X, RefreshCw } from 'lucide-react';
 import { WeatherData, AppState } from './types';
 import { CITY_COORDINATES } from './constants';
 import { fetchWeatherData } from './services/weatherService';
@@ -38,7 +38,8 @@ const App: React.FC = () => {
       setSearchQuery("");
     } catch (error) {
       console.error("Failed to load weather", error);
-      alert("Failed to fetch weather data. Please check your connection.");
+      alert("Failed to fetch weather data. Please check your connection or try a different city.");
+      
       // If we fail and have no data, go back to onboarding
       if (!weatherData) {
         setAppState(AppState.ONBOARDING);
@@ -84,26 +85,36 @@ const App: React.FC = () => {
   // Initialize App: Check local storage or browser permissions
   useEffect(() => {
     const initApp = async () => {
+       // Safety timeout: If nothing happens in 5 seconds, force Onboarding
+       const timeoutId = setTimeout(() => {
+         if (appState === AppState.LOADING && !weatherData) {
+           setAppState(AppState.ONBOARDING);
+         }
+       }, 5000);
+
        const savedPreference = localStorage.getItem('skycast_use_location') === 'true';
 
        const tryAutoLocation = () => {
          if (!navigator.geolocation) {
+            clearTimeout(timeoutId);
             setAppState(AppState.ONBOARDING);
             return;
          }
 
          navigator.geolocation.getCurrentPosition(
            (position) => {
+             clearTimeout(timeoutId);
              handleLocationFound(position.coords.latitude, position.coords.longitude);
            },
            (error) => {
+             clearTimeout(timeoutId);
              console.warn("Auto-location failed", error);
-             // If permission was denied specifically, clear the preference
              if (error.code === error.PERMISSION_DENIED) {
                  localStorage.removeItem('skycast_use_location');
              }
              setAppState(AppState.ONBOARDING);
-           }
+           },
+           { timeout: 8000 } // Geo timeout
          );
        };
 
@@ -112,7 +123,7 @@ const App: React.FC = () => {
            return;
        }
 
-       // If no preference saved, check if permission is already granted in browser
+       // Check permissions without forcing prompt
        if (navigator.permissions && navigator.geolocation) {
            try {
               const permission = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
@@ -123,11 +134,13 @@ const App: React.FC = () => {
            } catch (e) { /* ignore */ }
        }
        
-       // Fallback to Onboarding
+       // Fallback to Onboarding immediately if no preference
+       clearTimeout(timeoutId);
        setAppState(AppState.ONBOARDING);
     };
     
     initApp();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleGrantLocation = () => {
@@ -145,6 +158,7 @@ const App: React.FC = () => {
       (error) => {
         console.error("Error getting location", error);
         setAppState(AppState.ONBOARDING);
+        alert("Location access denied or timed out. Please search for a city manually.");
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -178,9 +192,8 @@ const App: React.FC = () => {
           loadWeather(parseFloat(lat), parseFloat(lon), cityName);
         } else {
           alert("City not found. Please try another name.");
-          // If we have data, go to dashboard, else onboarding
           setAppState(weatherData ? AppState.DASHBOARD : AppState.ONBOARDING);
-          if (weatherData) setIsSearchOpen(true); // Re-open search bar if in dashboard
+          if (weatherData) setIsSearchOpen(true);
         }
       } else {
         throw new Error("Search API failed");
@@ -215,7 +228,7 @@ const App: React.FC = () => {
     );
   }
 
-  // START SCREEN (ONBOARDING) - Used when no location permission & no search yet
+  // START SCREEN (ONBOARDING)
   if (appState === AppState.ONBOARDING || !weatherData) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -280,7 +293,7 @@ const App: React.FC = () => {
         {/* Footer for Onboarding */}
         <div className="absolute bottom-6 left-0 w-full text-center z-20">
              <p className="text-slate-500 text-xs">
-                Developed by <a href="https://www.linkedin.com/in/eleandro-mangrich" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-sky-400 transition-colors">Eleandro Mangrich</a>
+                Powered by Google Gemini & Open-Meteo
              </p>
         </div>
       </div>
@@ -496,15 +509,7 @@ const App: React.FC = () => {
         {/* Footer for Dashboard */}
         <footer className="mt-12 mb-8 text-center border-t border-slate-800 pt-8">
             <p className="text-slate-500 text-sm">
-            Developed by{' '}
-            <a 
-                href="https://www.linkedin.com/in/eleandro-mangrich" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-sky-500 hover:text-sky-400 font-medium transition-colors"
-            >
-                Eleandro Mangrich
-            </a>
+            Powered by Google Gemini & Open-Meteo
             </p>
         </footer>
 

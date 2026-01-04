@@ -25,7 +25,8 @@
         border-radius: 3px;
       }
     </style>
-  <script type="importmap">
+    <!-- REMOVED IMPORTMAP: It conflicts with Vite bundling and causes app crash -->
+<script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@^19.2.3",
@@ -42,7 +43,6 @@
 </head>
   <body>
     <div id="root"></div>
-    <!-- Changed /index.tsx to ./index.tsx for GitHub Pages compatibility -->
     <script type="module" src="./index.tsx"></script>
   </body>
 </html>

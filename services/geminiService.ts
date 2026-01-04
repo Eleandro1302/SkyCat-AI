@@ -4,35 +4,39 @@ import { WeatherData } from '../types';
 // Define process.env for TypeScript to avoid "Cannot find name 'process'" error
 declare const process: {
   env: {
-    API_KEY: string;
+    API_KEY?: string;
   }
 };
 
 let genAI: GoogleGenAI | null = null;
 
 const getAIClient = () => {
-  if (!genAI) {
-    try {
-      // The API key must be obtained exclusively from process.env.API_KEY
-      // Added safety check for runtime environment
-      const apiKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : '';
-      
-      if (!apiKey) {
-        console.warn("API_KEY is missing. AI features will be disabled.");
-        return null;
-      }
-      genAI = new GoogleGenAI({ apiKey });
-    } catch (error) {
-      console.error("Error initializing Gemini Client:", error);
+  if (genAI) return genAI;
+
+  try {
+    // Check if process is defined (browser safety) and API_KEY exists
+    // We treat empty strings or undefined as missing keys
+    const apiKey = (typeof process !== 'undefined' && process.env?.API_KEY) || "";
+    
+    if (!apiKey || apiKey.trim() === "" || apiKey === "undefined") {
+      console.warn("API_KEY is missing or invalid. AI features disabled.");
       return null;
     }
+    
+    genAI = new GoogleGenAI({ apiKey });
+    return genAI;
+  } catch (error) {
+    console.error("Error initializing Gemini Client:", error);
+    return null;
   }
-  return genAI;
 };
 
 export const generateWeatherInsight = async (data: WeatherData): Promise<string> => {
   const ai = getAIClient();
-  if (!ai) return "AI insight unavailable (API Key missing).";
+  
+  if (!ai) {
+    return "AI insights unavailable. Please add your API Key to the project settings to enable smart recommendations.";
+  }
 
   const locationContext = data.location.city === 'Current Location' 
     ? `Current Location (Coordinates: ${data.location.lat}, ${data.location.lng})`
@@ -63,6 +67,6 @@ export const generateWeatherInsight = async (data: WeatherData): Promise<string>
     return response.text || "Unable to generate insight right now.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Local weather data loaded. AI insight unavailable.";
+    return "Weather data loaded, but AI service is temporarily unavailable.";
   }
 };

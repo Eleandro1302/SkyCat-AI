@@ -3,13 +3,13 @@ import { WeatherData } from '../types';
 
 export const generateWeatherInsight = async (data: WeatherData): Promise<string> => {
   try {
-    // Access safely via the defined replacement
-    const apiKey = process.env.API_KEY;
+    // PADRÃO VITE: Para expor variáveis no frontend, elas devem começar com VITE_
+    // e são acessadas via import.meta.env
+    const apiKey = import.meta.env.VITE_API_KEY;
     
-    // Check if key is missing or empty string (common in production if secrets aren't set)
-    if (!apiKey || typeof apiKey !== 'string' || apiKey.trim() === "") {
-      console.warn("Gemini API Key is missing. Insights disabled.");
-      return "AI insights unavailable (Add API_KEY to settings).";
+    if (!apiKey) {
+      console.warn("VITE_API_KEY não encontrada. Insights desativados.");
+      return "AI insights unavailable (Configure VITE_API_KEY).";
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -36,14 +36,6 @@ export const generateWeatherInsight = async (data: WeatherData): Promise<string>
 
   } catch (error: any) {
     console.error("Gemini Error:", error);
-    
-    if (error.message?.includes("404")) {
-      return "AI temporarily unavailable.";
-    }
-    if (error.message?.includes("400") || error.message?.includes("API key")) {
-      return "Invalid API configuration.";
-    }
-    
     return "Weather looks interesting today! (AI Offline)";
   }
 };

@@ -1,0 +1,7 @@
+{
+  "name": "SkyCast AI - By Eleandro",
+  "description": "A modern, dynamic weather application featuring hyperlocal forecasts, interactive radar simulation, severe weather alerts, and AI-powered weather insights using Gemini.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

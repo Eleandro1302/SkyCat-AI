@@ -2,18 +2,28 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
-  // Load env file based on `mode` in the current working directory.
-  // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
+  // Carrega variáveis de ambiente do diretório atual
   const env = loadEnv(mode, process.cwd(), '');
   
   return {
-    base: './', // CRITICAL for GitHub Pages
+    // ESSENCIAL PARA GITHUB PAGES:
+    // Define o caminho base como relativo para que os assets carreguem
+    // independentemente do nome do repositório/subpasta.
+    base: './', 
+    
     plugins: [react()],
+    
     define: {
-      // Robustly inject the API key
+      // Injeta a API Key de forma segura no código buildado
       'process.env.API_KEY': JSON.stringify(env.API_KEY || ""),
-      // Polyfill for libraries expecting node env
+      // Garante compatibilidade com bibliotecas que verificam NODE_ENV
       'process.env.NODE_ENV': JSON.stringify(mode),
+    },
+    
+    build: {
+      outDir: 'dist',
+      assetsDir: 'assets',
+      sourcemap: false, // Desabilita sourcemaps em produção para economizar espaço
     }
   };
 });

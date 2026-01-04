@@ -12,20 +12,27 @@ let genAI: GoogleGenAI | null = null;
 
 const getAIClient = () => {
   if (!genAI) {
-    // The API key must be obtained exclusively from process.env.API_KEY
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-      console.error("API_KEY is missing in environment variables.");
+    try {
+      // The API key must be obtained exclusively from process.env.API_KEY
+      // Added safety check for runtime environment
+      const apiKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : '';
+      
+      if (!apiKey) {
+        console.warn("API_KEY is missing. AI features will be disabled.");
+        return null;
+      }
+      genAI = new GoogleGenAI({ apiKey });
+    } catch (error) {
+      console.error("Error initializing Gemini Client:", error);
       return null;
     }
-    genAI = new GoogleGenAI({ apiKey });
   }
   return genAI;
 };
 
 export const generateWeatherInsight = async (data: WeatherData): Promise<string> => {
   const ai = getAIClient();
-  if (!ai) return "AI services unavailable.";
+  if (!ai) return "AI insight unavailable (API Key missing).";
 
   const locationContext = data.location.city === 'Current Location' 
     ? `Current Location (Coordinates: ${data.location.lat}, ${data.location.lng})`

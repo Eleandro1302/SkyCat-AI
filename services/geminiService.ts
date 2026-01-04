@@ -1,25 +1,18 @@
 import { GoogleGenAI } from "@google/genai";
 import { WeatherData } from '../types';
 
-// Define process.env for TypeScript to avoid "Cannot find name 'process'" error
-declare const process: {
-  env: {
-    API_KEY?: string;
-  }
-};
-
 let genAI: GoogleGenAI | null = null;
 
 const getAIClient = () => {
   if (genAI) return genAI;
 
   try {
-    // Check if process is defined (browser safety) and API_KEY exists
-    // We treat empty strings or undefined as missing keys
-    const apiKey = (typeof process !== 'undefined' && process.env?.API_KEY) || "";
+    // Vite will replace 'process.env.API_KEY' with the actual string value during build.
+    // We check if it exists and is not empty.
+    const apiKey = process.env.API_KEY;
     
-    if (!apiKey || apiKey.trim() === "" || apiKey === "undefined") {
-      console.warn("API_KEY is missing or invalid. AI features disabled.");
+    if (!apiKey) {
+      console.warn("API_KEY is missing. AI features disabled.");
       return null;
     }
     
@@ -35,38 +28,34 @@ export const generateWeatherInsight = async (data: WeatherData): Promise<string>
   const ai = getAIClient();
   
   if (!ai) {
-    return "AI insights unavailable. Please add your API Key to the project settings to enable smart recommendations.";
+    return "AI insights unavailable (API Key missing).";
   }
 
   const locationContext = data.location.city === 'Current Location' 
-    ? `Current Location (Coordinates: ${data.location.lat}, ${data.location.lng})`
+    ? `Current Location`
     : data.location.city;
 
   const prompt = `
-    You are a witty, helpful personal weather assistant app named "SkyCast".
-    The current weather data for ${locationContext} is:
-    - Condition: ${data.current.condition}
-    - Temp: ${data.current.temp}°C (Feels like ${data.current.feelsLike}°C)
-    - Humidity: ${data.current.humidity}%
-    - Wind: ${data.current.windSpeed} km/h
-    - UV Index: ${data.current.uvIndex}
-    - Alerts: ${data.alerts.length > 0 ? data.alerts[0].title : "None"}
-
-    Provide a short, 2-sentence insight. 
-    1st sentence: Summary of the vibe based on the location/weather.
-    2nd sentence: Recommendation (clothing, activity, or safety).
-    Keep it modern and slightly fun.
+    The current weather for ${locationContext} is:
+    Condition: ${data.current.condition}
+    Temp: ${data.current.temp}°C (Feels: ${data.current.feelsLike}°C)
+    Wind: ${data.current.windSpeed} km/h
+    Humidity: ${data.current.humidity}%
+    
+    Give a 2-sentence witty weather report.
+    1. A fun observation about the vibe.
+    2. A practical tip (clothes/activity).
   `;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.5-flash-latest', // Using the fast/latest model alias
       contents: prompt,
     });
     
-    return response.text || "Unable to generate insight right now.";
+    return response.text || "Insight unavailable.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Weather data loaded, but AI service is temporarily unavailable.";
+    return "AI service temporarily unavailable.";
   }
 };

@@ -12,13 +12,11 @@ import AirQualityPanel from './components/AirQualityPanel';
 import WeatherEffects from './components/WeatherEffects';
 
 const App: React.FC = () => {
-  // Start with ONBOARDING by default to ensure UI renders immediately, 
-  // unless we have an automatic load process.
-  const [appState, setAppState] = useState<AppState>(AppState.LOADING);
+  // Default to ONBOARDING. Only switch to LOADING if we have a concrete action.
+  const [appState, setAppState] = useState<AppState>(AppState.ONBOARDING);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   
-  // Search State
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -29,10 +27,21 @@ const App: React.FC = () => {
     }
   }, [isSearchOpen]);
 
-  // Function to load weather data using the service
+  // INITIALIZATION LOGIC
+  useEffect(() => {
+    const checkSavedLocation = () => {
+      const savedPreference = localStorage.getItem('skycast_use_location');
+      if (savedPreference === 'true') {
+        handleGrantLocation();
+      }
+    };
+    checkSavedLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const loadWeather = async (lat: number, lng: number, locationName: string, district?: string) => {
+    setAppState(AppState.LOADING);
     try {
-      setAppState(AppState.LOADING);
       const data = await fetchWeatherData(lat, lng, locationName, district);
       setWeatherData(data);
       setAppState(AppState.DASHBOARD);
@@ -41,13 +50,7 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Failed to load weather", error);
       alert("Could not load weather data. Please try again.");
-      
-      // Fallback to onboarding on error
-      if (!weatherData) {
-        setAppState(AppState.ONBOARDING);
-      } else {
-        setAppState(AppState.DASHBOARD);
-      }
+      setAppState(AppState.ONBOARDING);
     }
   };
 
@@ -57,11 +60,12 @@ const App: React.FC = () => {
     let districtName = "";
     
     try {
+      // Fast reverse geocoding
       const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
       if (response.ok) {
         const data = await response.json();
         if (data && data.address) {
-          locationName = data.address.city || data.address.town || data.address.village || "Detected Location";
+          locationName = data.address.city || data.address.town || data.address.village || "My Location";
           districtName = data.address.suburb || "";
         }
       }
@@ -71,68 +75,25 @@ const App: React.FC = () => {
     loadWeather(latitude, longitude, locationName, districtName);
   };
 
-  useEffect(() => {
-    let isMounted = true;
-    const initApp = async () => {
-       // CRITICAL: Force stop loading after 4 seconds if nothing happens
-       const watchdog = setTimeout(() => {
-         if (isMounted && !weatherData) {
-           console.warn("Loading timed out, forcing onboarding");
-           setAppState(AppState.ONBOARDING);
-         }
-       }, 4000);
-
-       const savedPreference = localStorage.getItem('skycast_use_location') === 'true';
-
-       const tryAutoLocation = () => {
-         if (!navigator.geolocation) {
-            if(isMounted) setAppState(AppState.ONBOARDING);
-            return;
-         }
-         navigator.geolocation.getCurrentPosition(
-           (position) => {
-             clearTimeout(watchdog);
-             if(isMounted) handleLocationFound(position.coords.latitude, position.coords.longitude);
-           },
-           (error) => {
-             console.warn("Auto-location failed", error);
-             clearTimeout(watchdog);
-             if(isMounted) setAppState(AppState.ONBOARDING);
-           },
-           { timeout: 5000 }
-         );
-       };
-
-       if (savedPreference) {
-           tryAutoLocation();
-       } else {
-           // Allow a brief moment for permissions check, else go to onboarding
-           setTimeout(() => {
-             clearTimeout(watchdog);
-             if(isMounted && !weatherData && appState === AppState.LOADING) {
-                setAppState(AppState.ONBOARDING);
-             }
-           }, 1000);
-       }
-    };
-    
-    initApp();
-    return () => { isMounted = false; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   const handleGrantLocation = () => {
     if (!navigator.geolocation) {
       alert("Geolocation is not supported by your browser.");
       return;
     }
+    
     setAppState(AppState.LOADING);
+    
     navigator.geolocation.getCurrentPosition(
       (pos) => handleLocationFound(pos.coords.latitude, pos.coords.longitude),
-      () => {
+      (err) => {
+        console.warn(err);
         setAppState(AppState.ONBOARDING);
-        alert("Location access denied.");
+        // Don't alert immediately on auto-load failure to be less annoying
+        if (appState !== AppState.ONBOARDING) {
+             alert("Location access denied or failed.");
+        }
       },
-      { timeout: 10000 }
+      { timeout: 10000, enableHighAccuracy: false }
     );
   };
 
@@ -141,22 +102,27 @@ const App: React.FC = () => {
     if (!searchQuery.trim()) return;
 
     setAppState(AppState.LOADING);
-    try {
-      const normalizedQuery = searchQuery.trim();
-      // Check hardcoded cities first
-      const predefined = Object.keys(CITY_COORDINATES).find(c => c.toLowerCase() === normalizedQuery.toLowerCase());
-      
-      if (predefined) {
-        const coords = CITY_COORDINATES[predefined];
-        loadWeather(coords.lat, coords.lng, predefined);
-        return;
-      }
+    
+    // 1. Check Predefined Constants
+    const normalized = searchQuery.trim().toLowerCase();
+    const predefinedKey = Object.keys(CITY_COORDINATES).find(k => k.toLowerCase() === normalized);
+    
+    if (predefinedKey) {
+      const { lat, lng } = CITY_COORDINATES[predefinedKey];
+      loadWeather(lat, lng, predefinedKey);
+      return;
+    }
 
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(normalizedQuery)}&limit=1`);
+    // 2. OpenStreetMap Search
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1`);
       if (response.ok) {
         const results = await response.json();
-        if (results && results.length > 0) {
-          loadWeather(parseFloat(results[0].lat), parseFloat(results[0].lon), results[0].name || normalizedQuery);
+        if (results.length > 0) {
+          const { lat, lon, name, display_name } = results[0];
+          // Prefer simple name, fallback to first part of display name
+          const cityName = name || display_name.split(',')[0];
+          loadWeather(parseFloat(lat), parseFloat(lon), cityName);
         } else {
           alert("City not found.");
           setAppState(weatherData ? AppState.DASHBOARD : AppState.ONBOARDING);
@@ -165,8 +131,8 @@ const App: React.FC = () => {
         throw new Error("Search API error");
       }
     } catch (error) {
-      console.error("Search failed", error);
-      alert("Search failed. Check connection.");
+      console.error(error);
+      alert("Search failed. Check your connection.");
       setAppState(weatherData ? AppState.DASHBOARD : AppState.ONBOARDING);
     }
   };
@@ -177,36 +143,34 @@ const App: React.FC = () => {
     return 1;
   };
 
-  // LOADING VIEW
+  // --- RENDER STATES ---
+
   if (appState === AppState.LOADING) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4">
         <div className="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mb-4"></div>
         <p className="text-slate-400 animate-pulse text-center">
-          {searchQuery ? `Searching for "${searchQuery}"...` : "Initializing SkyCast AI..."}
+          Loading Forecast...
         </p>
         <button 
           onClick={() => setAppState(AppState.ONBOARDING)}
           className="mt-8 text-xs text-slate-500 underline hover:text-slate-300"
         >
-          Cancel and go to search
+          Cancel
         </button>
       </div>
     );
   }
 
-  // START SCREEN (ONBOARDING)
+  // Fallback to ONBOARDING if no data
   if (appState === AppState.ONBOARDING || !weatherData) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 relative overflow-hidden">
-        {/* Decorative Background */}
-        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-          <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-sky-500/10 rounded-full blur-[100px]"></div>
-          <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[100px]"></div>
-        </div>
+        {/* Background blobs */}
+        <div className="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] bg-sky-500/10 rounded-full blur-[100px] pointer-events-none"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-purple-500/10 rounded-full blur-[100px] pointer-events-none"></div>
 
-        <div className="relative z-10 w-full max-w-md text-center space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          
+        <div className="relative z-10 w-full max-w-md text-center space-y-8 animate-in fade-in zoom-in duration-500">
           <div className="flex flex-col items-center gap-4">
             <div className="w-20 h-20 bg-gradient-to-br from-sky-400 to-blue-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-sky-500/20">
                <Navigation className="w-10 h-10 text-white" />
@@ -215,7 +179,7 @@ const App: React.FC = () => {
               SkyCast AI
             </h1>
             <p className="text-slate-400 text-lg">
-              Hyperlocal weather insights.
+              Hyperlocal weather intelligence.
             </p>
           </div>
 
@@ -237,7 +201,7 @@ const App: React.FC = () => {
                 disabled={!searchQuery.trim()}
                 className="w-full bg-sky-500 hover:bg-sky-400 text-white font-medium py-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-sky-500/25"
               >
-                Search Weather
+                Get Forecast
               </button>
             </form>
 
@@ -260,11 +224,11 @@ const App: React.FC = () => {
     );
   }
 
-  // DASHBOARD VIEW
+  // DASHBOARD
   const sortedAlerts = [...weatherData.alerts].sort((a, b) => getSeverityWeight(b.severity) - getSeverityWeight(a.severity));
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-50 pb-20 md:pb-0 relative">
+    <div className="min-h-screen bg-slate-900 text-slate-50 pb-20 md:pb-0 relative overflow-x-hidden">
       
       <WeatherEffects condition={weatherData.current.condition} />
 
@@ -304,31 +268,21 @@ const App: React.FC = () => {
                     className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-3 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
                 >
                     <Search className="w-4 h-4" />
-                    <span className="hidden sm:inline">Search City</span>
+                    <span className="hidden sm:inline">Search</span>
                 </button>
                 <div className="h-6 w-px bg-slate-800 mx-1"></div>
-                <button onClick={handleGrantLocation} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sky-400 p-2 rounded-lg">
+                <button onClick={handleGrantLocation} className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sky-400 p-2 rounded-lg" title="Current Location">
                     <LocateFixed className="w-5 h-5" />
                 </button>
              </>
            )}
-            {!isSearchOpen && (
-                <>
-                    <button className="p-2 hover:bg-slate-800 rounded-full relative">
-                      <Bell className="w-5 h-5 text-slate-400" />
-                      {weatherData.alerts.length > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full"></span>}
-                    </button>
-                    <button className="md:hidden p-2 hover:bg-slate-800 rounded-full" onClick={() => setShowMobileMenu(!showMobileMenu)}>
-                      <Menu className="w-5 h-5 text-slate-400" />
-                    </button>
-                </>
-            )}
         </div>
       </header>
 
       {/* Main Content */}
       <main className="container mx-auto px-4 pt-20 max-w-5xl relative z-10">
         
+        {/* Alerts Banner */}
         {sortedAlerts.length > 0 && (
           <div className="mb-6 space-y-4">
             {sortedAlerts.map(alert => (
@@ -351,31 +305,30 @@ const App: React.FC = () => {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          {/* Left Column */}
           <div className="md:col-span-2 space-y-6">
             <CurrentConditions data={weatherData} />
+            
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-6 backdrop-blur-sm">
               <h3 className="font-semibold text-slate-200 mb-6">Hourly Forecast</h3>
               <ForecastChart data={weatherData.hourly} />
             </div>
-             <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-6 backdrop-blur-sm">
+
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-6 backdrop-blur-sm">
               <h3 className="font-semibold text-slate-200 mb-4">Interactive Radar</h3>
               <RadarView condition={weatherData.current.condition} lat={weatherData.location.lat} lng={weatherData.location.lng} precipChance={weatherData.hourly[0]?.precipChance || 0} />
             </div>
           </div>
 
+          {/* Right Column */}
           <div className="space-y-6">
             <AIWeatherInsight weatherData={weatherData} />
             <AirQualityPanel data={weatherData.current} />
+            
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-6 backdrop-blur-sm">
               <h3 className="font-semibold text-slate-200 mb-4">7-Day Forecast</h3>
               <DailyForecastList data={weatherData.daily} />
-            </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-6 backdrop-blur-sm">
-              <div className="flex items-center gap-2 mb-2">
-                 <Settings className="w-4 h-4 text-slate-400" />
-                 <h3 className="font-semibold text-slate-200">Customization</h3>
-              </div>
-              <p className="text-xs text-slate-400">Settings available in full version.</p>
             </div>
           </div>
         </div>

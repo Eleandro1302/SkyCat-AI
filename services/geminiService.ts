@@ -3,10 +3,13 @@ import { WeatherData } from '../types';
 
 export const generateWeatherInsight = async (data: WeatherData): Promise<string> => {
   try {
+    // Access safely via the defined replacement
     const apiKey = process.env.API_KEY;
     
-    if (!apiKey || apiKey === "") {
-      return "AI insights unavailable (API Key not configured).";
+    // Check if key is missing or empty string (common in production if secrets aren't set)
+    if (!apiKey || typeof apiKey !== 'string' || apiKey.trim() === "") {
+      console.warn("Gemini API Key is missing. Insights disabled.");
+      return "AI insights unavailable (Add API_KEY to settings).";
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -24,7 +27,6 @@ export const generateWeatherInsight = async (data: WeatherData): Promise<string>
       Include a practical clothing tip.
     `;
 
-    // Updated to the latest recommended model for text tasks
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,

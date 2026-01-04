@@ -3,14 +3,13 @@ import { WeatherData } from '../types';
 
 export const generateWeatherInsight = async (data: WeatherData): Promise<string> => {
   try {
-    // Check for API Key safely
     const apiKey = process.env.API_KEY;
     
-    if (!apiKey || apiKey === "" || typeof apiKey !== 'string') {
-      return "AI insights disabled (API Key missing). Add your key to get witty weather reports!";
+    if (!apiKey || apiKey === "") {
+      return "AI insights unavailable (API Key not configured).";
     }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey });
 
     const locationContext = data.location.city === 'Current Location' 
       ? `Current Location`
@@ -25,7 +24,7 @@ export const generateWeatherInsight = async (data: WeatherData): Promise<string>
       Include a practical clothing tip.
     `;
 
-    // Using gemini-3-flash-preview for maximum stability/availability
+    // Updated to the latest recommended model for text tasks
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
@@ -34,14 +33,13 @@ export const generateWeatherInsight = async (data: WeatherData): Promise<string>
     return response.text || "Enjoy the weather!";
 
   } catch (error: any) {
-    console.error("Gemini Safe Error:", error);
+    console.error("Gemini Error:", error);
     
-    // Graceful fallbacks for common errors
     if (error.message?.includes("404")) {
-      return "AI temporarily unavailable (Model Not Found).";
+      return "AI temporarily unavailable.";
     }
     if (error.message?.includes("400") || error.message?.includes("API key")) {
-      return "Please check your API Key configuration.";
+      return "Invalid API configuration.";
     }
     
     return "Weather looks interesting today! (AI Offline)";

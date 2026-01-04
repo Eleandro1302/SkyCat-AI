@@ -52,7 +52,7 @@ This project leverages the latest in modern web development technologies:
 
 1.  **Clone the repository**
     ```bash
-    git clone https://github.com/your-username/skycast-ai.git
+    git clone https://github.com/Eleandro1302/skycast-ai.git
     ```
 
 2.  **Install dependencies**
@@ -81,6 +81,6 @@ This project leverages the latest in modern web development technologies:
 
 Designed and Developed with ❤️ and ☕.
 
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-blue?style=for-the-badge&logo=linkedin)](https://www.linkedin.com/in/eleandro-mangrich)
+[![GitHub](https://img.shields.io/badge/GitHub-Profile-black?style=for-the-badge&logo=github)](https://github.com/Eleandro1302)
 
 </div>

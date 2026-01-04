@@ -48,8 +48,9 @@ export const generateWeatherInsight = async (data: WeatherData): Promise<string>
   `;
 
   try {
+    // Usando gemini-1.5-flash para garantir compatibilidade e evitar erro 404
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-1.5-flash',
       contents: prompt,
     });
     

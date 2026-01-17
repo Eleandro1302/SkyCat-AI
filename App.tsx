@@ -1,8 +1,10 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Navigation, ShieldAlert, LocateFixed, Search, X, Linkedin } from 'lucide-react';
+import { Navigation, ShieldAlert, LocateFixed, Search, X, Linkedin, MapPin } from 'lucide-react';
 import { WeatherData, AppState } from './types';
 import { CITY_COORDINATES } from './constants';
 import { fetchWeatherData, getMockData } from './services/weatherService';
+import { t, getLocale } from './utils/i18n';
 import CurrentConditions from './components/CurrentConditions';
 import ForecastChart from './components/ForecastChart';
 import RadarView from './components/RadarView';
@@ -12,83 +14,103 @@ import AirQualityPanel from './components/AirQualityPanel';
 import WeatherEffects from './components/WeatherEffects';
 
 const App: React.FC = () => {
-  const [appState, setAppState] = useState<AppState>(AppState.ONBOARDING);
+  const [appState, setAppState] = useState<AppState>(AppState.LOADING);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isLocating, setIsLocating] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const trans = t();
+  const locale = getLocale();
+
+  const DEFAULT_CITY = "London";
 
   useEffect(() => {
     let isMounted = true;
-    const init = async () => {
-      const savedPreference = localStorage.getItem('skycast_use_location');
-      
-      if (savedPreference === 'true') {
-        if (isMounted) setAppState(AppState.LOADING);
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            if (isMounted) handleLocationFound(pos.coords.latitude, pos.coords.longitude);
-          },
-          () => {
-            if (isMounted) loadDefaultCity();
-          },
-          { timeout: 4000 }
-        );
-      } else {
-        // Fallback rápido para evitar tela vazia
-        const timer = setTimeout(() => {
-          if (isMounted && !weatherData) loadDefaultCity();
-        }, 2000);
-        return () => clearTimeout(timer);
+    const initializeApp = async () => {
+      const getPosition = () => {
+        return new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true, // Mudança para alta precisão
+            timeout: 10000, // Aumentado para dar tempo ao hardware de GPS
+            maximumAge: 0 // Força busca de localização fresca, não cacheada
+          });
+        });
+      };
+
+      try {
+        setIsLocating(true);
+        const position = await getPosition();
+        if (isMounted) await handleLocationFound(position.coords.latitude, position.coords.longitude);
+      } catch (error) {
+        console.warn("Geolocation failed, falling back to default.", error);
+        if (isMounted) loadDefaultCity();
+      } finally {
+        if (isMounted) setIsLocating(false);
       }
     };
-    init();
+
+    initializeApp();
     return () => { isMounted = false; };
   }, []);
 
   const loadDefaultCity = () => {
-    const defaultCity = "São Paulo";
-    const coords = CITY_COORDINATES[defaultCity];
-    loadWeather(coords.lat, coords.lng, defaultCity);
+    const coords = CITY_COORDINATES[DEFAULT_CITY];
+    loadWeather(coords.lat, coords.lng, DEFAULT_CITY);
   };
 
   const loadWeather = async (lat: number, lng: number, locationName: string, district?: string) => {
-    setAppState(AppState.LOADING);
     try {
       const data = await fetchWeatherData(lat, lng, locationName, district);
       setWeatherData(data);
       setAppState(AppState.DASHBOARD);
       setIsSearchOpen(false);
     } catch (error) {
-      console.error("Load weather failed", error);
       setWeatherData(getMockData(locationName));
       setAppState(AppState.DASHBOARD);
     }
   };
 
   const handleLocationFound = async (latitude: number, longitude: number) => {
-    localStorage.setItem('skycast_use_location', 'true');
-    let locationName = "Localização Atual";
+    let locationName = locale === 'pt' ? "Minha Localização" : "My Location";
+    let districtName = "";
+
     try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=${locale}`
+      );
+      
       if (response.ok) {
         const data = await response.json();
-        locationName = data.address.city || data.address.town || "Minha Localização";
+        const addr = data.address;
+        
+        // Lógica de prioridade para nome da cidade/localidade
+        locationName = addr.city || addr.town || addr.village || addr.municipality || addr.city_district || locationName;
+        
+        // Captura o bairro ou distrito para exibição secundária
+        districtName = addr.suburb || addr.neighbourhood || addr.hamlet || addr.district || "";
+        
+        // Se o nome da cidade e bairro forem iguais, limpa o distrito para não repetir
+        if (districtName.toLowerCase() === locationName.toLowerCase()) {
+          districtName = "";
+        }
       }
-    } catch (e) { console.warn(e); }
-    loadWeather(latitude, longitude, locationName);
+    } catch (e) {
+      console.error("Reverse geocoding error:", e);
+    }
+    
+    await loadWeather(latitude, longitude, locationName, districtName);
   };
 
-  const handleGrantLocation = () => {
-    if (!navigator.geolocation) {
-      loadDefaultCity();
-      return;
-    }
-    setAppState(AppState.LOADING);
+  const handleManualLocationRequest = () => {
+    setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) => handleLocationFound(pos.coords.latitude, pos.coords.longitude),
-      () => loadDefaultCity(),
-      { timeout: 8000 }
+      (pos) => handleLocationFound(pos.coords.latitude, pos.coords.longitude).finally(() => setIsLocating(false)),
+      (err) => {
+        console.error("Manual location error:", err);
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
@@ -96,127 +118,123 @@ const App: React.FC = () => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     const normalized = searchQuery.trim();
-    const predefined = Object.keys(CITY_COORDINATES).find(k => k.toLowerCase() === normalized.toLowerCase());
     
-    if (predefined) {
-      loadWeather(CITY_COORDINATES[predefined].lat, CITY_COORDINATES[predefined].lng, predefined);
-      return;
-    }
-
     setAppState(AppState.LOADING);
     try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(normalized)}&limit=1`);
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(normalized)}&limit=1&accept-language=${locale}`);
       const results = await response.json();
       if (results.length > 0) {
-        loadWeather(parseFloat(results[0].lat), parseFloat(results[0].lon), results[0].name);
+        // Para buscas manuais, tentamos extrair um nome mais curto do display_name
+        const parts = results[0].display_name.split(',');
+        const name = parts[0];
+        loadWeather(parseFloat(results[0].lat), parseFloat(results[0].lon), name);
       } else {
-        alert("Cidade não encontrada.");
-        setAppState(weatherData ? AppState.DASHBOARD : AppState.ONBOARDING);
+        setAppState(AppState.DASHBOARD);
       }
     } catch (error) {
-      setAppState(weatherData ? AppState.DASHBOARD : AppState.ONBOARDING);
+      setAppState(AppState.DASHBOARD);
     }
   };
 
   if (appState === AppState.LOADING) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4">
-        <div className="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-slate-400 animate-pulse font-medium">Sintonizando dados...</p>
+      <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-6">
+        <div className="relative z-10 flex flex-col items-center">
+          <div className="w-20 h-20 mb-8 relative">
+             <div className="absolute inset-0 bg-sky-500/20 rounded-2xl animate-pulse"></div>
+             <div className="relative bg-slate-900 border border-slate-800 w-full h-full rounded-2xl flex items-center justify-center">
+                <Navigation className="w-8 h-8 text-sky-400 animate-bounce" />
+             </div>
+          </div>
+          <h1 className="text-xl font-bold text-white tracking-widest uppercase mb-4">SkyCast AI</h1>
+          <div className="flex items-center gap-2 text-slate-400 text-sm">
+            <MapPin className="w-3 h-3 text-sky-500 animate-pulse" />
+            {trans.loadingSub}
+          </div>
+          <button onClick={loadDefaultCity} className="mt-16 text-[10px] text-slate-600 hover:text-sky-400 uppercase tracking-widest">{trans.skipToLondon}</button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-50 relative overflow-x-hidden">
+    <div className="min-h-screen bg-[#020617] text-slate-50 relative overflow-x-hidden">
       {weatherData && <WeatherEffects condition={weatherData.current.condition} />}
       
-      <header className="fixed top-0 w-full bg-[#0f172a]/80 backdrop-blur-md border-b border-slate-800 z-50 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setAppState(AppState.ONBOARDING)}>
-          <div className="w-8 h-8 bg-sky-500 rounded-lg flex items-center justify-center shadow-lg shadow-sky-500/20">
-             <Navigation className="w-5 h-5 text-white" />
+      <header className="fixed top-0 w-full bg-[#020617]/80 backdrop-blur-xl border-b border-slate-800/50 z-50 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.location.reload()}>
+          <div className="w-9 h-9 bg-sky-500 rounded-lg flex items-center justify-center shadow-lg shadow-sky-500/20">
+             <Navigation className="w-4 h-4 text-white" />
           </div>
-          <span className="font-bold text-lg hidden sm:block">SkyCast AI</span>
+          <span className="font-bold text-lg tracking-tight">SkyCast AI</span>
         </div>
-        
         <div className="flex items-center gap-2">
           {isSearchOpen ? (
-            <form onSubmit={handleSearchSubmit} className="flex relative">
+            <form onSubmit={handleSearchSubmit} className="flex relative animate-in slide-in-from-right-4">
               <input 
                 ref={searchInputRef}
                 type="text" 
-                className="bg-slate-800 border border-sky-500 text-white text-sm rounded-lg pl-3 pr-8 py-2 outline-none w-40 sm:w-64"
-                placeholder="Buscar cidade..."
+                className="bg-slate-900 border border-sky-500/30 text-white text-xs rounded-lg pl-3 pr-8 py-2 w-40 sm:w-60"
+                placeholder={trans.searchPlaceholder}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
-              <button type="button" onClick={() => setIsSearchOpen(false)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"><X className="w-4 h-4" /></button>
+              <button type="button" onClick={() => setIsSearchOpen(false)} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500"><X className="w-3 h-3" /></button>
             </form>
           ) : (
-            <button onClick={() => setIsSearchOpen(true)} className="bg-slate-800 hover:bg-slate-700 p-2 rounded-lg transition-colors"><Search className="w-5 h-5 text-slate-300" /></button>
+            <button onClick={() => setIsSearchOpen(true)} className="p-2 text-slate-400 hover:text-white"><Search className="w-5 h-5" /></button>
           )}
-          <button onClick={handleGrantLocation} className="bg-slate-800 hover:bg-slate-700 p-2 rounded-lg text-sky-400 transition-colors"><LocateFixed className="w-5 h-5" /></button>
+          <button onClick={handleManualLocationRequest} disabled={isLocating} className="p-2 text-sky-400 hover:text-sky-300">
+            <LocateFixed className={`w-5 h-5 ${isLocating ? 'animate-spin' : ''}`} />
+          </button>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 pt-20 pb-10 max-w-5xl relative z-10">
-        {weatherData ? (
+      <main className="container mx-auto px-4 pt-24 pb-12 max-w-6xl relative z-10">
+        {weatherData && (
           <>
-            {weatherData.alerts.length > 0 && (
-              <div className="mb-6 space-y-3">
-                {weatherData.alerts.map(alert => (
-                  <div key={alert.id} className="bg-red-900/40 border border-red-500/50 rounded-xl p-4 flex gap-4 items-center animate-in slide-in-from-top duration-500">
-                    <ShieldAlert className="w-6 h-6 text-red-500 shrink-0" />
-                    <div>
-                      <h3 className="font-bold text-red-200">{alert.title}</h3>
-                      <p className="text-sm text-red-300/80">{alert.description}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="md:col-span-2 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+              <div className="md:col-span-8 space-y-6">
                 <CurrentConditions data={weatherData} />
-                <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6 backdrop-blur-sm shadow-xl">
-                  <h3 className="font-semibold text-slate-200 mb-6">Previsão por Hora</h3>
-                  <ForecastChart data={weatherData.hourly} />
-                </div>
-                <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6 backdrop-blur-sm shadow-xl">
-                  <h3 className="font-semibold text-slate-200 mb-4 text-sm uppercase tracking-wider opacity-60">Visualização de Radar</h3>
-                  <RadarView condition={weatherData.current.condition} lat={weatherData.location.lat} lng={weatherData.location.lng} precipChance={weatherData.hourly[0]?.precipChance || 0} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="bg-slate-900/50 border border-slate-800/50 rounded-[2rem] p-6 backdrop-blur-md">
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-6">{trans.thermalFlow}</h3>
+                    <ForecastChart data={weatherData.hourly} />
+                  </div>
+                  <RadarView 
+                    condition={weatherData.current.condition} 
+                    lat={weatherData.location.lat} 
+                    lng={weatherData.location.lng} 
+                    precipChance={weatherData.hourly[0]?.precipChance || 0} 
+                    windSpeed={weatherData.current.windSpeed}
+                  />
                 </div>
               </div>
-              
-              <div className="space-y-6">
+              <div className="md:col-span-4 space-y-6">
                 <AIWeatherInsight weatherData={weatherData} />
                 <AirQualityPanel data={weatherData.current} />
-                <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6 backdrop-blur-sm shadow-xl">
-                  <h3 className="font-semibold text-slate-200 mb-4">Próximos 7 Dias</h3>
+                <div className="bg-slate-900/50 border border-slate-800/50 rounded-[2rem] p-6 backdrop-blur-md">
+                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">{trans.nextDays}</h3>
                   <DailyForecastList data={weatherData.daily} />
                 </div>
               </div>
             </div>
+
+            <footer className="mt-20 pt-12 border-t border-slate-800/30 flex flex-col items-center">
+              <a href="https://www.linkedin.com/in/eleandro-mangrich" target="_blank" rel="noopener noreferrer" className="group flex flex-col items-center gap-4">
+                <div className="w-12 h-12 bg-slate-900 border border-slate-800 rounded-full flex items-center justify-center text-slate-400 group-hover:text-sky-400 transition-all">
+                  <Linkedin className="w-5 h-5" />
+                </div>
+                <div className="text-center">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-slate-500">Eleandro Mangrich</span>
+                  <p className="text-[9px] text-slate-600 mt-1 uppercase tracking-widest">
+                    {locale === 'pt' ? 'Arquitetura SkyCast AI' : 'SkyCast AI Architecture'} 2026
+                  </p>
+                </div>
+              </a>
+            </footer>
           </>
-        ) : (
-          <div className="text-center py-20">
-            <h2 className="text-2xl font-bold text-slate-400 mb-4">Carregando dados meteorológicos...</h2>
-            <button onClick={loadDefaultCity} className="bg-sky-500 text-white px-6 py-2 rounded-full font-medium">Tentar Novamente</button>
-          </div>
         )}
-        
-        <footer className="mt-12 text-center border-t border-slate-800/50 pt-8">
-          <a 
-            href="https://www.linkedin.com/in/eleandro-mangrich" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-slate-500 hover:text-sky-400 transition-all duration-300 group"
-          >
-            <Linkedin className="w-4 h-4 group-hover:scale-110" />
-            <span className="text-xs font-medium uppercase tracking-widest">Desenvolvido por Eleandro Mangrich</span>
-          </a>
-        </footer>
       </main>
     </div>
   );

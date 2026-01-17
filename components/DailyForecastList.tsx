@@ -1,13 +1,13 @@
 import React from 'react';
 import { DailyForecast } from '../types';
 import { Sun, Cloud, CloudRain, CloudLightning, CloudSnow, CloudDrizzle } from 'lucide-react';
+import { t } from '../utils/i18n';
 
 interface Props {
   data: DailyForecast[];
 }
 
 const AnimatedIcon = ({ condition, precipChance }: { condition: string, precipChance: number }) => {
-  // Styles for custom micro-animations
   const styles = `
     @keyframes drop-fall {
       0% { transform: translateY(-5px); opacity: 0; }
@@ -40,7 +40,6 @@ const AnimatedIcon = ({ condition, precipChance }: { condition: string, precipCh
        <div className="relative w-8 h-8 flex items-center justify-center">
          <style>{styles}</style>
          {isHeavy ? <CloudRain className="w-6 h-6 text-blue-400" /> : <CloudDrizzle className="w-6 h-6 text-blue-300" />}
-         {/* Animated Drops */}
          <div className="absolute top-4 left-3 w-0.5 h-1.5 bg-blue-400 rounded-full" style={{ animation: 'drop-fall 1s infinite linear' }}></div>
          <div className="absolute top-4 left-5 w-0.5 h-1.5 bg-blue-400 rounded-full" style={{ animation: 'drop-fall 1s infinite linear', animationDelay: '0.3s' }}></div>
        </div>
@@ -66,22 +65,29 @@ const AnimatedIcon = ({ condition, precipChance }: { condition: string, precipCh
     return <Cloud className="w-6 h-6 text-sky-200" />;
   }
 
-  // Default cloudy
   return <Cloud className="w-6 h-6 text-slate-400" />;
 };
 
-const getPrecipitationType = (condition: string) => {
-  if (condition === 'Snow' || condition.includes('Ice')) return 'Snow';
-  if (condition === 'Rain' || condition === 'Storm' || condition.includes('Drizzle')) return 'Rain';
-  return 'Rain';
+const getTranslatedCondition = (condition: string) => {
+  const trans = t().conditions;
+  switch (condition) {
+    case 'Sunny': return trans.sunny;
+    case 'Partly Cloudy': return trans.partlyCloudy;
+    case 'Cloudy': return trans.cloudy;
+    case 'Rain': return trans.rain;
+    case 'Storm': return trans.storm;
+    case 'Snow': return trans.snow;
+    default: return condition;
+  }
 };
 
 const DailyForecastList: React.FC<Props> = ({ data }) => {
+  const trans = t();
   return (
     <div className="space-y-4">
       {data.map((day, idx) => {
         const isPrecip = day.precipChance > 0;
-        const precipType = getPrecipitationType(day.condition);
+        const precipTypeLabel = getPrecipitationTypeLabel(day.condition);
         
         let labelText = "";
         let chanceText = "";
@@ -89,20 +95,16 @@ const DailyForecastList: React.FC<Props> = ({ data }) => {
 
         if (isPrecip) {
             chanceText = `${day.precipChance}%`;
-            labelText = precipType;
-            textColor = precipType === 'Snow' ? 'text-white' : 'text-blue-300';
+            labelText = precipTypeLabel;
+            textColor = day.condition === 'Snow' ? 'text-white' : 'text-blue-300';
         } else {
-            labelText = day.condition === 'Partly Cloudy' ? 'Cloudy' : day.condition;
-            textColor = labelText === 'Sunny' ? 'text-amber-400' : 'text-slate-400';
+            labelText = getTranslatedCondition(day.condition);
+            textColor = day.condition === 'Sunny' ? 'text-amber-400' : 'text-slate-400';
         }
 
         return (
             <div key={idx} className="flex items-center justify-between text-sm group hover:bg-slate-700/30 p-2 rounded-lg transition-all duration-300">
-            
-            {/* Day Name */}
             <span className="w-10 text-slate-400 font-medium shrink-0">{day.day}</span>
-            
-            {/* Icon & Probability Label - Expanded & Explicit */}
             <div className="flex items-center gap-3 w-28 shrink-0">
                 <div className="shrink-0">
                     <AnimatedIcon condition={day.condition} precipChance={day.precipChance} />
@@ -118,8 +120,6 @@ const DailyForecastList: React.FC<Props> = ({ data }) => {
                     </span>
                 </div>
             </div>
-
-            {/* Temperature Bar */}
             <div className="flex-1 px-2 hidden sm:block">
                 <div className="h-1.5 w-full bg-slate-700 rounded-full overflow-hidden relative">
                     <div 
@@ -135,8 +135,6 @@ const DailyForecastList: React.FC<Props> = ({ data }) => {
                     ></div>
                 </div>
             </div>
-
-            {/* High/Low */}
             <div className="flex gap-3 text-slate-300 w-16 justify-end font-mono shrink-0">
                 <span className="opacity-60">{day.minTemp}°</span>
                 <span className="font-bold">{day.maxTemp}°</span>
@@ -146,6 +144,12 @@ const DailyForecastList: React.FC<Props> = ({ data }) => {
       })}
     </div>
   );
+};
+
+const getPrecipitationTypeLabel = (condition: string) => {
+  const trans = t();
+  if (condition === 'Snow' || condition.includes('Ice')) return trans.snow;
+  return trans.rain;
 };
 
 export default DailyForecastList;

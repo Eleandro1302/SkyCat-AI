@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Sparkles, RefreshCw } from 'lucide-react';
 import { generateWeatherInsight } from '../services/geminiService';
 import { WeatherData } from '../types';
+import { t } from '../utils/i18n';
 
 interface Props {
   weatherData: WeatherData;
@@ -10,6 +11,7 @@ interface Props {
 const AIWeatherInsight: React.FC<Props> = ({ weatherData }) => {
   const [insight, setInsight] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  const trans = t();
 
   const fetchInsight = async () => {
     setLoading(true);
@@ -30,7 +32,7 @@ const AIWeatherInsight: React.FC<Props> = ({ weatherData }) => {
           <div className="bg-indigo-500 p-1.5 rounded-lg shadow-lg shadow-indigo-500/20">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
-          <h3 className="text-indigo-200 font-semibold text-sm tracking-wide">SkyCast AI Insight</h3>
+          <h3 className="text-indigo-200 font-semibold text-sm tracking-wide">{trans.aiInsightTitle}</h3>
         </div>
         <button 
           onClick={fetchInsight}
@@ -46,6 +48,7 @@ const AIWeatherInsight: React.FC<Props> = ({ weatherData }) => {
           <div className="space-y-2 animate-pulse">
             <div className="h-4 bg-indigo-500/20 rounded w-3/4"></div>
             <div className="h-4 bg-indigo-500/20 rounded w-1/2"></div>
+            <p className="text-[10px] text-indigo-400 mt-1 uppercase tracking-widest">{trans.establishingData}</p>
           </div>
         ) : (
           <p className="text-slate-200 text-sm leading-relaxed font-light">

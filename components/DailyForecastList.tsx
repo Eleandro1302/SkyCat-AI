@@ -82,7 +82,6 @@ const getTranslatedCondition = (condition: string) => {
 };
 
 const DailyForecastList: React.FC<Props> = ({ data }) => {
-  const trans = t();
   return (
     <div className="space-y-4">
       {data.map((day, idx) => {

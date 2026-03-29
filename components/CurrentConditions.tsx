@@ -1,7 +1,7 @@
 import React from 'react';
 import { WeatherData } from '../types';
 import { Wind, Droplets, Sun, CloudRain, Cloud, CloudLightning, Thermometer, CloudSnow, Flower2, MapPin } from 'lucide-react';
-import { t } from '../utils/i18n';
+import { t, getLocale } from '../utils/i18n';
 
 interface Props {
   data: WeatherData;
@@ -29,6 +29,7 @@ const ConditionIcon = ({ condition }: { condition: string }) => {
 const CurrentConditions: React.FC<Props> = ({ data }) => {
   const { current } = data;
   const trans = t();
+  const locale = getLocale();
 
   const getPollenColor = (level: string) => {
     switch (level) {
@@ -87,9 +88,17 @@ const CurrentConditions: React.FC<Props> = ({ data }) => {
             </div>
           </div>
           
-          <div className="space-y-1">
+          <div className="space-y-1 mb-6">
             <p className="text-2xl text-slate-200 font-bold tracking-tight">{current.description}</p>
             <p className="text-slate-400 font-medium tracking-wide">{trans.feelsLike} <span className="text-white">{current.feelsLike}°C</span></p>
+          </div>
+
+          <div className="max-w-md bg-slate-800/20 rounded-2xl p-4 border border-slate-700/30">
+            <p className="text-xs text-slate-400 leading-relaxed">
+              {locale === 'pt' 
+                ? `Atualmente em ${data.location.city}, as condições são de ${current.description.toLowerCase()}. Com uma temperatura de ${current.temp}°C e umidade de ${current.humidity}%, o clima está influenciado por padrões atmosféricos locais. O índice UV de ${current.uvIndex} sugere precauções apropriadas para exposição solar.`
+                : `Currently in ${data.location.city}, conditions are ${current.description.toLowerCase()}. With a temperature of ${current.temp}°C and humidity of ${current.humidity}%, the weather is influenced by local atmospheric patterns. The UV index of ${current.uvIndex} suggests appropriate precautions for sun exposure.`}
+            </p>
           </div>
         </div>
 

@@ -46,7 +46,14 @@ const translations = {
       snow: "Neve",
       fog: "Nevoeiro",
       drizzle: "Garoa"
-    }
+    },
+    contactTitle: "Contate-nos",
+    contactSub: "Tem perguntas ou feedback? Adoraríamos ouvir você. Nossa equipe é dedicada a fornecer a melhor experiência meteorológica.",
+    about: "Sobre",
+    privacy: "Privacidade",
+    terms: "Termos",
+    articles: "Artigos",
+    contact: "Contato"
   },
   en: {
     loadingTitle: "Tuning Satellites",
@@ -92,7 +99,14 @@ const translations = {
       snow: "Snow",
       fog: "Fog",
       drizzle: "Drizzle"
-    }
+    },
+    contactTitle: "Contact Us",
+    contactSub: "Have questions or feedback? We would love to hear from you. Our team is dedicated to providing the best weather experience.",
+    about: "About",
+    privacy: "Privacy",
+    terms: "Terms",
+    articles: "Articles",
+    contact: "Contact"
   }
 };
 

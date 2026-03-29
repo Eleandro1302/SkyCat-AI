@@ -62,7 +62,22 @@ const PrivacyPolicy: React.FC = () => {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-white mb-4">4. Data Security</h2>
+              <h2 className="text-xl font-semibold text-white mb-4">4. Data Retention and User Rights</h2>
+              <p className="mb-4">
+                We retain your location data only for the duration of your session to provide accurate forecasts. We do not store your precise location on our servers long-term.
+              </p>
+              <p className="mb-4">
+                As a user, you have the right to:
+              </p>
+              <ul className="list-disc pl-6 space-y-2 text-slate-400">
+                <li>Access the data we have collected about you (which is minimal and anonymous).</li>
+                <li>Request the deletion of any data we might have stored.</li>
+                <li>Opt-out of data collection by disabling location services in your browser.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-semibold text-white mb-4">5. Data Security</h2>
               <p>
                 The security of your data is important to us, but remember that no method of transmission over the Internet, or method of electronic storage is 100% secure. While we strive to use commercially acceptable means to protect your Personal Data, we cannot guarantee its absolute security.
               </p>
@@ -78,7 +93,7 @@ const PrivacyPolicy: React.FC = () => {
             <section>
               <h2 className="text-xl font-semibold text-white mb-4">6. Contact Us</h2>
               <p>
-                If you have any questions about this Privacy Policy, please contact us through our official channels.
+                If you have any questions about this Privacy Policy, please contact us at <a href="mailto:eleandro1302@gmail.com" className="text-sky-400 hover:underline">eleandro1302@gmail.com</a>.
               </p>
             </section>
           </div>

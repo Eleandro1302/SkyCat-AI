@@ -51,7 +51,24 @@ const TermsOfService: React.FC = () => {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-white mb-4">4. Intellectual Property Rights</h2>
+              <h2 className="text-xl font-semibold text-white mb-4">4. User Contributions and Conduct</h2>
+              <p className="mb-4">
+                Users may have the opportunity to provide feedback or suggestions. By submitting such content, you grant SkyCast AI a non-exclusive, royalty-free, perpetual, and irrevocable right to use, reproduce, and modify such content.
+              </p>
+              <p className="mb-4">
+                You agree not to use the service to transmit any content that is unlawful, harmful, threatening, or otherwise objectionable.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-semibold text-white mb-4">5. Third-Party Links</h2>
+              <p className="mb-4">
+                Our Application may contain links to third-party websites or services that are not owned or controlled by SkyCast AI. We have no control over, and assume no responsibility for, the content, privacy policies, or practices of any third-party websites or services.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-semibold text-white mb-4">6. Intellectual Property Rights</h2>
               <p className="mb-4">
                 The Application and its entire contents, features, and functionality (including but not limited to all information, software, text, displays, images, video, and audio, and the design, selection, and arrangement thereof) are owned by SkyCast AI, its licensors, or other providers of such material and are protected by international copyright, trademark, patent, trade secret, and other intellectual property or proprietary rights laws.
               </p>
@@ -84,7 +101,7 @@ const TermsOfService: React.FC = () => {
             <section>
               <h2 className="text-xl font-semibold text-white mb-4">8. Contact Information</h2>
               <p className="mb-4">
-                If you have any questions about these Terms of Service, please contact us.
+                If you have any questions about these Terms of Service, please contact us at <a href="mailto:eleandro1302@gmail.com" className="text-sky-400 hover:underline">eleandro1302@gmail.com</a>.
               </p>
             </section>
           </div>
